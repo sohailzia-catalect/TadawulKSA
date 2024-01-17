@@ -5,7 +5,6 @@ from pathlib import Path
 import base64
 from langchain.llms.openai import OpenAI
 from langchain.callbacks import get_openai_callback
-import streamlit as st
 from langchain.embeddings.openai import OpenAIEmbeddings
 import os
 from langchain.vectorstores import FAISS
@@ -37,6 +36,11 @@ from llama_index import (
     Prompt,
     ServiceContext
 )
+from llama_index.postprocessor.cohere_rerank import CohereRerank
+
+from llama_index.retrievers import BM25Retriever
+from llama_index.retrievers import BaseRetriever
+from llama_index.query_engine import RetrieverQueryEngine
 
 dotenv.load_dotenv(".env")
 
@@ -44,7 +48,6 @@ EMBEDDING_MODEL = 'text-embedding-ada-002'
 EMBEDDING_CTX_LENGTH = 8191
 EMBEDDING_ENCODING = 'cl100k_base'
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 embeddings = OpenAIEmbeddings(openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 client = orig_openai(api_key=os.getenv("OPENAI_API_KEY"))
@@ -54,7 +57,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 data_path = r"C:\Users\Catalect\PycharmProjects\tadawulchat\data"
 
 template = (
-    "You are Saudi Stock Exchange chat assistant. Your job is to answer queries with information provided to you from website. "
+    "You are Saudi Stock Exchange chat assistant. Your job is to answer queries with information provided to you. "
     "\n Make sure to be helpful and only consider the information provided to you. "
     " \n Where possible, also present the information in a nice format. "
     "---------------------\n"
@@ -92,6 +95,16 @@ def get_rag_llm():
     return rag_llm
 
 
+def get_rag_llm_mistral():
+    rag_llm = Together(
+        model="mistralai/Mistral-7B-Instruct-v0.2",
+        temperature=0.01,
+        max_tokens=8196,
+        top_k=0.5,
+        together_api_key=os.getenv("TOGETHER_API_KEY"))
+    return rag_llm
+
+
 # "mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 llm = OpenAILike(
@@ -104,21 +117,96 @@ llm = OpenAILike(
 )
 
 
-@st.cache_data
-def get_query_engine():
+class HybridRetriever(BaseRetriever):
+    def __init__(self, vector_retriever, bm25_retriever):
+        self.vector_retriever = vector_retriever
+        self.bm25_retriever = bm25_retriever
+
+    def _retrieve(self, query, **kwargs):
+        bm25_nodes = self.bm25_retriever.retrieve(query, **kwargs)
+        vector_nodes = self.vector_retriever.retrieve(query, **kwargs)
+
+        # whatever and how many retrievers u use, get their nodes and combine it.
+
+        # combine the two lists of nodes
+        all_nodes = []
+        node_ids = set()
+        for n in bm25_nodes + vector_nodes:
+            if n.node.node_id not in node_ids:
+                all_nodes.append(n)
+                node_ids.add(n.node.node_id)
+        return all_nodes
+
+
+@st.cache_resource
+def get_vector_index():
     service_context = ServiceContext.from_defaults(
         llm=llm
     )
     # index = VectorStoreIndex.from_documents(get_data(), service_context=service_context)
-    # index.storage_context.persist("faiss_index")
-    index = load_index_from_storage(StorageContext.from_defaults(persist_dir="faiss_index"))
+    # index.storage_context.persist("index/website_data_index")
+    index = load_index_from_storage(StorageContext.from_defaults(persist_dir="index/website_data_index"))
+
+    return index
+
+
+import time
+
+
+def get_keyword_based_retriever(index):
+    service_context = ServiceContext.from_service_context(index.service_context)
+    node_parser = service_context.node_parser
+    nodes = node_parser.get_nodes_from_documents(get_data())
+    bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=5)
+    return bm25_retriever
+
+
+@st.cache_resource
+def get_hybrid_retriever():
+    vector_index = get_vector_index()
+    st = time.time()
+    vector_based_retriever = vector_index.as_retriever()
+    print("Time taken for vector based: ", time.time() - st)
+    keyword_based_retriever = get_keyword_based_retriever(vector_index)
+    st = time.time()
+    hybrid_retriever = HybridRetriever(vector_based_retriever, keyword_based_retriever)
+    print("Time taken for keyword based: ", st)
+
+    return hybrid_retriever, vector_index
+
+
+@st.cache_resource
+def get_re_ranker():
+    # from llama_index.postprocessor import SentenceTransformerRerank
+    # reranker = SentenceTransformerRerank(top_n=4, model="BAAI/bge-reranker-base")
+
+    cohere_rerank = CohereRerank(api_key=os.getenv("COHERE_API_KEY"), top_n=3)
+    return cohere_rerank
+
+
+@st.cache_data
+def get_query_engine():
+    service_context = ServiceContext.from_defaults(llm=llm)
+
+    index = VectorStoreIndex.from_documents(get_data(), service_context=service_context)
+    index.storage_context.persist("index/website_data_index")
+    index = load_index_from_storage(StorageContext.from_defaults(persist_dir="index/website_data_index"))
 
     query_engine = index.as_query_engine(text_qa_template=qa_template, similarity_top_k=2)
     return query_engine
 
 
+def get_query_engine_2():
+    retriever, index = get_hybrid_retriever()
+    query_engine = RetrieverQueryEngine.from_args(
+        retriever=retriever,
+        service_context=index.service_context,
+        text_qa_template=qa_template)
+    return query_engine
+
+
 def get_response(question):
-    query_engine = get_query_engine()
+    query_engine = get_query_engine_2()
 
     response = query_engine.query(question)
     return response
@@ -126,16 +214,15 @@ def get_response(question):
 
 @st.cache_data
 def get_pkl_df():
-    pkl_file_path = r"C:\Users\Catalect\PycharmProjects\tadawulchat\data.pkl"
+    pkl_file_path = "data.pkl"
     df = pd.read_pickle(pkl_file_path)
     return df
 
 
 def get_contextual_answer(user_question, context):
     prompT = (
-        f"You are Saudi Stock Exchange chat assistant. Your job is to answer queries with information provided to you from website. "
-        f"\n Make sure to be helpful and only consider the information provided to you. "
-        f" \n Where possible, also present the information in a nice format. "
+        f"You are Saudi Stock Exchange chat assistant. Your job is to answer queries with information provided to you. "
+        f"\n Make sure to be helpful and only consider the information provided to you."
         f"\n If you think the question is irrelevant, just ask the user to go away!"
         "---------------------\n"
         f"{context}"
@@ -152,7 +239,7 @@ class Message:
 
 
 def load_css():
-    with open("static\styles.css", "r") as f:
+    with open("static/styles.css", "r") as f:
         css = f"<style>{f.read()}</style>"
         st.markdown(css, unsafe_allow_html=True)
 
@@ -169,8 +256,13 @@ def responser(user_question):
 
     context = results["Raw Content"].iloc[0]
     answer = get_contextual_answer(user_question, context)
-    return answer + "\n\n" + "\n For more detailed information, go to: " + results["Reference"][
-        0] + "\n\n I was able find relevant data with conf score of " + str(results["Simscores"][0])
+    # if len(answer) > 300:
+    #     answer = get_rag_llm_mistral()((
+    #                                         f"Your job is to reformat given data into nice looking format in markdown, only if it can be cultivated. Input:{answer}.\n Reformated Markdown Text: "))
+    # return (answer + "\n\n" + "\n For more detailed information, go to: " + results["Reference"][0] )
+    return answer
+
+            # + "\n\n I was able find relevant data with conf score of " + str(results["Simscores"][0]))
 
 
 def initialize_session_state():
@@ -201,15 +293,15 @@ def on_click_callback():
 load_css()
 initialize_session_state()
 
-st.image("second_image.jpg", width=700)
+st.image("images/second_image.jpg", width=700)
 st.title("SaudiXChange Helpdesk 🤖")
 
-file_ = open("ksa icon cropped.png", "rb")
+file_ = open("images/ksa icon cropped.png", "rb")
 contents = file_.read()
 ai_icon_url = base64.b64encode(contents).decode("utf-8")
 file_.close()
 
-file_ = open("user_icon.png", "rb")
+file_ = open("images/user_icon.png", "rb")
 contents = file_.read()
 user_icon_url = base64.b64encode(contents).decode("utf-8")
 file_.close()
@@ -241,7 +333,7 @@ with prompt_placeholder:
     cols = st.columns((6, 1))
     cols[0].text_input(
         "Chat",
-        value="Thou shall ask ya حمار",
+        value="Thou shall ask...",
         label_visibility="collapsed",
         key="human_prompt",
     )

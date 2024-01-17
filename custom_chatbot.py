@@ -19,8 +19,7 @@ from llama_index import (
     StorageContext,
     load_index_from_storage,
     Prompt,
-    ServiceContext
-)
+    ServiceContext)
 
 dotenv.load_dotenv(".env")
 
