@@ -19,7 +19,7 @@ import glob
 
 openai.api_key = "<Openai_key>"
 
-os.environ["OPENAI_API_KEY"] =
+os.environ["OPENAI_API_KEY"] = ""
 
 def load_docs(files):
     all_text = ""

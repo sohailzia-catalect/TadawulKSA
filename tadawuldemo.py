@@ -216,7 +216,7 @@ def manual_answering(query):
     else:
         context = get_context()
         prompt = f"You are Saudi Stock Exchange chat assistant. Your job is to provide information related to companies using the given context. Make sure to be helpful and only consider the information provided to you: {context}. \n Given this information, please answer: {query}"
-        return get_mistral_llm().complete(prompt).text
+        return get_llm().complete(prompt).text
 
 
 @st.cache_resource

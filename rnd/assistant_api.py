@@ -11,7 +11,7 @@ st.set_page_config(page_title="KSAXchange App", page_icon=":speech_balloon:")
 
 
 
-dotenv.load_dotenv('.env')
+dotenv.load_dotenv('../.env')
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
