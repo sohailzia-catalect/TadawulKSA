@@ -12,6 +12,7 @@ No. Of Trades: 1,670
 Average Trade Size: 64
 Total Volume Traded: 106,903
 Value Traded (SAR): 27,507,050
+
 Commodity Channel Index (CCI) based on 20-day Mean Deviation: 73.36
 20-Day Moving Average: 246.58
 Standard Deviation for Last Month: 12.41
