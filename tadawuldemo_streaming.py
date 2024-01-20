@@ -259,4 +259,4 @@ if user_query := st.text_input(label="Ask me stuff", label_visibility="collapsed
         stream_handler = StreamHandler(st.empty())
         response = get_qa_chain().run(user_query, callbacks=[stream_handler])
         print("Answer generated: ", response)
-        msgs.add_ai_message(response)
+        msgs.add_ai_message(get_reference(response))
