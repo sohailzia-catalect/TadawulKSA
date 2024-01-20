@@ -61,7 +61,7 @@ def load_docs(files):
     return all_text
 
 
-filename = "/data"
+filename = "data"
 
 EMBEDDING_MODEL = 'text-embedding-ada-002'
 EMBEDDING_CTX_LENGTH = 8191
