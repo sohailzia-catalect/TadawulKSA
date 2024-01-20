@@ -2,7 +2,6 @@ import os
 import tempfile
 import streamlit as st
 from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
 from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -12,11 +11,26 @@ import PyPDF2
 from langchain.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 import base64
+from langchain.prompts import PromptTemplate
+import dotenv
+
+dotenv.load_dotenv(".env")
 
 st.set_page_config(page_title="KSA XChange Agent", page_icon="🤖")
 st.header("🤖 Saudi Exchange VAI Assistant", divider='rainbow')
 
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+template = """You are Saudi Stock Exchange chat assistant and so act like one. 
+Your job is to answer queries with information provided to 
+you. Make sure to be helpful and only consider the information provided to you. Don't try to make up an answer. 
+If you don't know the answer, simply say that you don't know.
+Where possible, also present the information in a nice format. "{context}" Given above information, please answer the 
+question while providing as much details as possible and if you cannot find answer to the question, 
+simple say that you do not know. Question: {question}
+Answer: 
+"""
+
 
 def load_docs(files):
     print("In progress: Loading data into a single text.")
@@ -39,6 +53,14 @@ def load_docs(files):
 
 
 filename = r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data"
+
+prompt = PromptTemplate(
+    template=template,
+    input_variables=[
+        'context',
+        'question',
+    ]
+)
 
 
 def split_texts(text, chunk_size, overlap):
@@ -111,7 +133,8 @@ header {visibility: hidden;}
 
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-@st.cache_resource(ttl="1h")
+
+@st.cache_resource()
 def configure_retriever():
     loaded_text = load_docs(filename)
 
@@ -147,28 +170,28 @@ class StreamHandler(BaseCallbackHandler):
         self.container.markdown(self.text)
 
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-retriever = configure_retriever()
+
+@st.cache_resource()
+def get_qa_chain():
+    retriever = configure_retriever()
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo-16k", temperature=0.4, streaming=True, api_key=os.getenv("OPENAI_API_KEY"))
+
+    qa_chain = RetrievalQA.from_llm(llm, retriever=retriever, verbose=True)
+    return qa_chain
+
 
 # Setup memory for contextual conversation
 msgs = StreamlitChatMessageHistory()
-memory = ConversationBufferMemory(memory_key="chat_history", chat_memory=msgs, return_messages=True)
-
-# Setup LLM and QA chain
-llm = ChatOpenAI(
-    model_name="gpt-3.5-turbo-16k", temperature=0.4, streaming=True)
-
-qa_chain = RetrievalQA.from_llm(llm, retriever=retriever, verbose=True)
 
 if len(msgs.messages) == 0:
     msgs.clear()
     msgs.add_ai_message("How can I help you?")
 
-print(len(msgs.messages))
-
 avatars = {"human": "user", "ai": "assistant"}
-avatar_emoji = {"human":"👳", "ai":"🤖"}
+avatar_emoji = {"human": "👳", "ai": "🤖"}
 
 for msg in msgs.messages:
     st.chat_message(avatars[msg.type], avatar=avatar_emoji[msg.type]).write(msg.content)
@@ -179,5 +202,5 @@ if user_query := st.text_input(label="Ask me stuff", label_visibility="collapsed
 
     with st.chat_message("assistant", avatar="🤖"):
         stream_handler = StreamHandler(st.empty())
-        response = qa_chain.run(user_query, callbacks=[stream_handler])
+        response = get_qa_chain().run(user_query, callbacks=[stream_handler])
         msgs.add_ai_message(response)
