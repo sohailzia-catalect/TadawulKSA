@@ -61,7 +61,7 @@ def load_docs(files):
     return all_text
 
 
-filename = r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data"
+filename = "/data"
 
 EMBEDDING_MODEL = 'text-embedding-ada-002'
 EMBEDDING_CTX_LENGTH = 8191
@@ -192,7 +192,7 @@ def cosine_similarity(a, b):
 
 @st.cache_data
 def get_pkl_df():
-    pkl_file_path = r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data_updated.pkl"
+    pkl_file_path = "/data_updated.pkl"
     df = pd.read_pickle(pkl_file_path)
     return df
 
