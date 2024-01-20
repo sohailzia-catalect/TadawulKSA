@@ -14,7 +14,6 @@ from langchain.llms import Together
 import tiktoken
 from openai import OpenAI as orig_openai
 import numpy as np
-import pandas as pd
 import dotenv
 import streamlit.components.v1 as components
 import os

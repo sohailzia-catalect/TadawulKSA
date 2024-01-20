@@ -27,25 +27,25 @@ EMBEDDING_CTX_LENGTH = 8191
 EMBEDDING_ENCODING = 'cl100k_base'
 
 data = {
-    "About Us.pdf": {
+    "About Us": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/about-saudi-exchange/aboutus?locale=en"},
 
-    "Become a Member.pdf": {
+    "Become a Member": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/trading/participants-directory/become-a-member?locale=en"},
 
-    "Become an Inf_Index Provider.pdf": {
+    "Become an Inf_Index Provider": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/trading/participants-directory/become-an-information-provider?locale=en"},
 
-    "Issuer.pdf": {
+    "Issuer": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/listing/become-an-issuer?locale=en"},
 
-    "Nomu - Parallel Market.pdf": {
+    "Nomu - Parallel Market": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/rules-guidance/capital-market-overview/Equities?locale=en"},
 
-    "Sukuk and Bonds.pdf": {
+    "Sukuk and Bonds": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/rules-guidance/capital-market-overview/sukuk-and-bonds?locale=en"},
 
-    "Investor.pdf": {
+    "Investor": {
         "ref": "https://www.saudiexchange.sa/wps/portal/saudiexchange/trading/investing-trading/become_an_investor?locale=en" + "\n" +
                "https://www.saudiexchange.sa/wps/portal/saudiexchange/trading/investing-trading/qualified_foreign_investors"}
 }
@@ -77,30 +77,53 @@ def get_summarized_content_gpt4(content):
     return response.choices[0].message.content
 
 
+def get_context(folder):
+    with open(folder, 'r') as file:
+        # Read the entire contents of the file
+        file_contents = file.read()
+
+    return file_contents
+
 def get_all_data():
-    for folder in os.listdir(r"/data"):
+    for folder in os.listdir(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data"):
+        file_ext = folder.split(".")[-1]
+        name = folder.split(".")[0]
+        if file_ext.__eq__("txt"):
+            filecontents = get_context(os.path.join(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data", folder))
+            contents = filecontents.split("Company Name:")
+            for content in contents[1:]:
+                company_name = content.split("\n")[0]
+                ref = content.split("Reference:")[-1].split("\n")[0]
 
-        pdf_reader = PyPDF2.PdfReader(os.path.join(r"/data", folder))
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        summarized_content = get_summarized_content_gpt4(text)
-        response_output = client.embeddings.create(input=truncate_text_tokens(summarized_content),
-                                                   model="text-embedding-ada-002")
-        embedding = response_output.data[0].embedding
+                response_output = client.embeddings.create(input=truncate_text_tokens(content),
+                                                           model="text-embedding-ada-002")
+                embedding = response_output.data[0].embedding
+                data[company_name] = {}
+                data[company_name]["content"] = content
+                data[company_name]["embedding"] = embedding
+                data[company_name]["ref"] = ref
 
-        data[folder]["content"] = summarized_content
-        data[folder]["raw_content"] = text
-        data[folder]["embedding"] = embedding
+        else:
+            pdf_reader = PyPDF2.PdfReader(os.path.join(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\data", folder))
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+            response_output = client.embeddings.create(input=truncate_text_tokens(text),
+                                                       model="text-embedding-ada-002")
+            embedding = response_output.data[0].embedding
+
+            data[name]["content"] = text
+            data[name]["embedding"] = embedding
+
     df = pd.DataFrame(data)
 
     data_final = []
 
     for col in df.columns:
-        data_final.append((col, df[col]["content"], df[col]["raw_content"], df[col]["embedding"], df[col]["ref"]))
-    dff = pd.DataFrame(data_final, columns=["Name", "Content", "Raw Content", "Embedding", "Reference"])
-    dff.to_pickle("data.pkl")
-    dff.to_csv("data.csv")
+        data_final.append((col, df[col]["content"], df[col]["embedding"], df[col]["ref"]))
+    dff = pd.DataFrame(data_final, columns=["Name", "Content", "Embedding", "Reference"])
+    dff.to_pickle("data_updated.pkl")
+    dff.to_csv("data_updated.csv")
 
 
 get_all_data()
