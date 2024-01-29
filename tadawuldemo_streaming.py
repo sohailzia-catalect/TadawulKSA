@@ -138,9 +138,7 @@ st.markdown(page_bg_img, unsafe_allow_html=True)
 hide_st_style = """
  <style>
 
-#MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
  </style>
 
 """
@@ -247,8 +245,42 @@ if len(msgs.messages) == 0:
 avatars = {"human": "user", "ai": "assistant"}
 avatar_emoji = {"human": "👳", "ai": "🤖"}
 
-for msg in msgs.messages:
-    st.chat_message(avatars[msg.type], avatar=avatar_emoji[msg.type]).write(msg.content)
+keywords = ["rajhi", "bilad", "saudi telecom", "telecom", "stc", "aramco", "saudiaramco", "sauditelecom", "alrajhi",
+            "albilad", "acwapower", "acwa", "acwa power"]
+
+
+def draw_graph_if_required(question):
+    print("bilad" in question or "albilad" in question or "al-bilad" in question)
+    if "rajhi" in question or "alrajhi" in question or "al-rajhi" in question:
+        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - Al Rajhi.csv")
+        df["Close"] = df["Close"].astype(float)
+        st.subheader("Last Month Closing Price of :blue[Al Rajhi]")
+        st.line_chart(df, x="Date", y="Close", width=700)
+
+    if "bilad" in question or "albilad" in question or "al-bilad" in question:
+        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - AlBilad.csv")
+        df["Close"] = df["Close"].astype(float)
+        st.subheader("Last Month Closing Price of :blue[Al Bilad]")
+        st.line_chart(df, x="Date", y="Close", width=700)
+
+    if "saudi telecom" in question or "telecom" in question or "stc" in question or "sauditelecom" in question:
+        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - STC.csv")
+        df["Close"] = df["Close"].astype(float)
+        st.subheader("Last Month Closing Price of :blue[Saudi Telecom]")
+        st.line_chart(df, x="Date", y="Close", width=700)
+
+    if "aramco" in question or "saudiaramco" in question or "saudi-aramco" in question:
+        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - Aramco.csv")
+        df["Close"] = df["Close"].astype(float)
+        st.subheader("Last Month Closing Price of :blue[Saudi Aramco]")
+        st.line_chart(df, x="Date", y="Close", width=700)
+
+    if "acwa" in question or "acwa-power" in question or "acwapower" in question:
+        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - ACWA.csv")
+        df["Close"] = df["Close"].astype(float)
+        st.subheader("Last Month Closing Price of :blue[ACWA Power]")
+        st.line_chart(df, x="Date", y="Close", width=700)
+
 
 if user_query := st.text_input(label="Ask me stuff", label_visibility="collapsed"):
     print("-----------")
@@ -260,4 +292,5 @@ if user_query := st.text_input(label="Ask me stuff", label_visibility="collapsed
         stream_handler = StreamHandler(st.empty())
         response = get_qa_chain().run(user_query, callbacks=[stream_handler])
         print("Answer generated: ", response)
-        msgs.add_ai_message(get_reference(response))
+        st.markdown("---")
+        draw_graph_if_required(user_query.lower())
