@@ -1,8 +1,6 @@
 import os
 from typing import Optional, Any
 from uuid import UUID
-
-import streamlit as st
 from langchain.chat_models import ChatOpenAI
 from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
 from langchain.callbacks.base import BaseCallbackHandler
@@ -20,11 +18,13 @@ import pandas as pd
 import tiktoken
 import numpy as np
 from openai import OpenAI
+import os
+import psutil
+
+pid = os.getpid()
+python_process = psutil.Process(pid)
 
 dotenv.load_dotenv(".env")
-
-st.set_page_config(page_title="KSA XChange Agent", page_icon="🤖")
-st.header("🤖 Saudi Exchange VAI Assistant", divider='rainbow')
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
@@ -84,70 +84,6 @@ def split_texts(text, chunk_size, overlap):
     return splits
 
 
-main_bg = "images/darken_image.jpg"
-main_bg_ext = ".jpg"
-
-
-def get_img_as_base64(file):
-    with open(file, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
-
-img = get_img_as_base64(main_bg)
-
-page_bg_img = f"""
-<style>
-[data-testid="stAppViewContainer"] > .main {{
-background-image: url("data:image/jpg;base64,{img}");
-background-size: 100%;
-background-position: center;
-background-repeat: repeat;
-background-attachment: local;
-}}
-
-[data-testid="stSidebar"] > div:first-child {{
-background-image: url("data:image/jpg;base64,{img}");
-background-position: center; 
-background-repeat: no-repeat;
-background-attachment: fixed;
-}}
-
-[data-testid="stHeader"] {{
-background: rgba(0,0,0,0);
-}}
-
-
-[data-testid="stToolbar"] {{
-right: 2rem;
-
-}}
-.stTextInput {{
-      position: fixed;
-      bottom: 3rem;
-      background: rgba(100,0,0,0);
-      z-index: +1;    
-      }}
-
-</style>
-
-"""
-
-st.markdown(page_bg_img, unsafe_allow_html=True)
-
-hide_st_style = """
- <style>
-
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
- </style>
-
-"""
-
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
-
 def get_reference(context):
     response_output = client.embeddings.create(input=truncate_text_tokens(context),
                                                model="text-embedding-ada-002")
@@ -158,12 +94,11 @@ def get_reference(context):
     results = df.sort_values("Simscores", ascending=False)
     max_conf_score = results.reset_index()["Simscores"][0]
     print("max_conf_score: ", max_conf_score)
-    if max_conf_score >= 0.79:
+    if max_conf_score >= 0.78:
         return context + "\n\nFor more information, go to: " + results.reset_index()["Reference"][0]
     return context
 
 
-@st.cache_resource()
 def configure_retriever():
     loaded_text = load_docs(filename)
 
@@ -191,43 +126,12 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-@st.cache_data
 def get_pkl_df():
     pkl_file_path = "data_updated.pkl"
     df = pd.read_pickle(pkl_file_path)
     return df
 
 
-class StreamHandler(BaseCallbackHandler):
-    def __init__(self, container: st.delta_generator.DeltaGenerator, initial_text: str = ""):
-        self.container = container
-        self.text = initial_text
-        self.run_id_ignore_token = None
-
-    def on_llm_start(self, serialized: dict, prompts: list, **kwargs):
-        # Workaround to prevent showing the rephrased question as output
-        if prompts[0].startswith("Human"):
-            self.run_id_ignore_token = kwargs.get("run_id")
-
-    def on_llm_new_token(self, token: str, **kwargs) -> None:
-        if self.run_id_ignore_token == kwargs.get("run_id", False):
-            return
-        self.text += token
-        self.container.markdown(self.text)
-
-    def on_llm_end(
-            self,
-            response: LLMResult,
-            *,
-            run_id: UUID,
-            parent_run_id: Optional[UUID] = None,
-            **kwargs: Any,
-    ) -> Any:
-        self.text = get_reference(self.text)
-        self.container.markdown(self.text)
-
-
-@st.cache_resource()
 def get_qa_chain():
     retriever = configure_retriever()
     llm = ChatOpenAI(
@@ -237,27 +141,55 @@ def get_qa_chain():
     return qa_chain
 
 
-# Setup memory for contextual conversation
-msgs = StreamlitChatMessageHistory()
-
-if len(msgs.messages) == 0:
-    msgs.clear()
-    msgs.add_ai_message("How can I help you?")
-
 avatars = {"human": "user", "ai": "assistant"}
 avatar_emoji = {"human": "👳", "ai": "🤖"}
 
-for msg in msgs.messages:
-    st.chat_message(avatars[msg.type], avatar=avatar_emoji[msg.type]).write(msg.content)
+user_query = "how do i become a member?"
 
-if user_query := st.text_input(label="Ask me stuff", label_visibility="collapsed"):
-    print("-----------")
-    print("Question asked: ", user_query)
-    st.chat_message("user", avatar="👳").write(user_query)
-    msgs.add_user_message(user_query)
+NUM_OF_CONCURRENT_REQUESTS = 100
 
-    with st.chat_message("assistant", avatar="🤖"):
-        stream_handler = StreamHandler(st.empty())
-        response = get_qa_chain().run(user_query, callbacks=[stream_handler])
-        print("Answer generated: ", response)
-        msgs.add_ai_message(get_reference(response))
+
+
+import concurrent.futures
+import psutil  # Make sure to install it using: pip install psutil
+
+
+def run_qa_chain(user_query):
+    response = get_qa_chain().run(user_query)
+    ram_usage_after = measure_ram_usage()
+    print(ram_usage_after)
+    return response
+
+def measure_ram_usage():
+    process = psutil.Process()
+
+    return process.memory_info().rss / (1024 ** 2)  # Convert to MB
+
+def main():
+    user_query = "how do i become a member?"
+
+    # Set the number of parallel tasks (adjust as needed)
+    num_parallel_tasks = 20
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_parallel_tasks) as executor:
+        futures = [executor.submit(run_qa_chain, user_query) for _ in range(num_parallel_tasks)]
+
+        # Wait for all tasks to complete
+        concurrent.futures.wait(futures)
+
+        # Collect results (if needed)
+        results = [future.result() for future in futures]
+
+    # Measure RAM usage after completion
+    ram_usage_after = measure_ram_usage()
+
+    print(f"RAM usage before: {ram_usage_before:.2f} MB")
+    print(f"RAM usage after: {ram_usage_after:.2f} MB")
+
+if __name__ == "__main__":
+    # Measure RAM usage before starting
+    ram_usage_before = measure_ram_usage()
+
+    # Run the main function
+    main()
+

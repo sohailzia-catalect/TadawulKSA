@@ -28,7 +28,7 @@ chat = ChatOpenAI(model_name="gpt-3.5-turbo-16k", streaming=True, callbacks=[str
 
 
 def get_context():
-    with open("company_info_context.txt", 'r') as file:
+    with open("../company_info_context.txt", 'r') as file:
         # Read the entire contents of the file
         file_contents = file.read()
 
