@@ -124,7 +124,7 @@ right: 2rem;
 }}
 .stTextInput {{
       position: fixed;
-      bottom: 3rem;
+      bottom: 0.5rem;
       background: rgba(100,0,0,0);
       z-index: +1;    
       }}
@@ -252,31 +252,31 @@ keywords = ["rajhi", "bilad", "saudi telecom", "telecom", "stc", "aramco", "saud
 def draw_graph_if_required(question):
     print("bilad" in question or "albilad" in question or "al-bilad" in question)
     if "rajhi" in question or "alrajhi" in question or "al-rajhi" in question:
-        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - Al Rajhi.csv")
+        df = pd.read_csv("company_data/Info - Al Rajhi.csv")
         df["Close"] = df["Close"].astype(float)
         st.subheader("Last Month Closing Price of :blue[Al Rajhi]")
         st.line_chart(df, x="Date", y="Close", width=700)
 
     if "bilad" in question or "albilad" in question or "al-bilad" in question:
-        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - AlBilad.csv")
+        df = pd.read_csv("company_data/Info - AlBilad.csv")
         df["Close"] = df["Close"].astype(float)
         st.subheader("Last Month Closing Price of :blue[Al Bilad]")
         st.line_chart(df, x="Date", y="Close", width=700)
 
     if "saudi telecom" in question or "telecom" in question or "stc" in question or "sauditelecom" in question:
-        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - STC.csv")
+        df = pd.read_csv("company_data/Info - STC.csv")
         df["Close"] = df["Close"].astype(float)
         st.subheader("Last Month Closing Price of :blue[Saudi Telecom]")
         st.line_chart(df, x="Date", y="Close", width=700)
 
     if "aramco" in question or "saudiaramco" in question or "saudi-aramco" in question:
-        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - Aramco.csv")
+        df = pd.read_csv("company_data/Info - Aramco.csv")
         df["Close"] = df["Close"].astype(float)
         st.subheader("Last Month Closing Price of :blue[Saudi Aramco]")
         st.line_chart(df, x="Date", y="Close", width=700)
 
     if "acwa" in question or "acwa-power" in question or "acwapower" in question:
-        df = pd.read_csv(r"C:\Users\Catalect\Documents\GitHub\TadawulKSA\company_data\Info - ACWA.csv")
+        df = pd.read_csv("company_data/Info - ACWA.csv")
         df["Close"] = df["Close"].astype(float)
         st.subheader("Last Month Closing Price of :blue[ACWA Power]")
         st.line_chart(df, x="Date", y="Close", width=700)
