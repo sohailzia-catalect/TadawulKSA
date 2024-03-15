@@ -127,7 +127,7 @@ def cosine_similarity(a, b):
 
 
 def get_pkl_df():
-    pkl_file_path = "data_updated.pkl"
+    pkl_file_path = "references.pkl"
     df = pd.read_pickle(pkl_file_path)
     return df
 

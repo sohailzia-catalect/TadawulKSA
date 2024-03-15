@@ -9,8 +9,6 @@ from openai import OpenAI
 # Set up the Streamlit page with a title and icon
 st.set_page_config(page_title="KSAXchange App", page_icon=":speech_balloon:")
 
-
-
 dotenv.load_dotenv('../.env')
 
 openai.api_key = os.getenv("OPENAI_API_KEY")

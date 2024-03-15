@@ -122,7 +122,7 @@ def get_all_data():
     for col in df.columns:
         data_final.append((col, df[col]["content"], df[col]["embedding"], df[col]["ref"]))
     dff = pd.DataFrame(data_final, columns=["Name", "Content", "Embedding", "Reference"])
-    dff.to_pickle("data_updated.pkl")
+    dff.to_pickle("references.pkl")
     dff.to_csv("data_updated.csv")
 
 
